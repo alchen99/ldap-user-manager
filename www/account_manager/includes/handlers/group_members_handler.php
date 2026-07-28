@@ -51,31 +51,7 @@ if (isset($_POST["update_members"])) {
 
   if ($group_exists == TRUE) {
 
-    if ($initialise_group != TRUE and count($to_update) > 0) {
-
-      if (isset($this_group[0]['objectclass'])) {
-        $existing_objectclasses = $this_group[0]['objectclass'];
-        unset($existing_objectclasses['count']);
-        if ($existing_objectclasses != $LDAP['group_objectclasses']) { $to_update['objectclass'] = $LDAP['group_objectclasses']; }
-      }
-
-      $updated_attr = ldap_update_group_attributes($ldap_connection,$group_cn,$to_update);
-
-      if ($updated_attr) {
-        // Audit log group attribute update
-        $update_fields = array_keys($to_update);
-        $update_details = "Updated fields: " . implode(', ', $update_fields);
-        audit_log('group_updated', $group_cn, $update_details, 'success', $USER_ID);
-        render_alert_banner("The group attributes have been updated.");
-      }
-      else {
-        // Audit log failed update
-        audit_log('group_update_failure', $group_cn, "Failed to update group attributes", 'failure', $USER_ID);
-        render_alert_banner("There was a problem updating the group attributes.  See the logs for more information.","danger",15000);
-      }
-
-    }
-
+    // Attributes are handled by group_attributes_handler.php; this handler is membership-only (#268).
     foreach ($members_to_add as $this_member) {
       if (ldap_add_member_to_group($ldap_connection,$group_cn,$this_member)) {
         // Audit log member addition

@@ -11,9 +11,8 @@ if (!defined('LDAP_USER_MANAGER')) {
 
 ?>
 <form id="group_attributes" action="<?php print $CURRENT_PAGE; ?>" method="post" enctype="multipart/form-data">
-  <input type="hidden" name="update_members">
+  <input type="hidden" name="update_attributes">
   <input type="hidden" name="group_name" value="<?php print urlencode($group_cn); ?>">
-  <?php if ($new_group == TRUE) { ?><input type="hidden" name="initialise_group"><?php } ?>
 
   <div class="col-md-8">
     <?php

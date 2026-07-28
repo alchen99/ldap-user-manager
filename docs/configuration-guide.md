@@ -488,8 +488,10 @@ Template for auto-generating usernames. Spaces and hyphens in names are automati
 **Available placeholders:**
 - `{first_name}` - User's full first name
 - `{first_name_initial}` - First letter of first name
+- `{first_name:N}` - First N characters of first name (N=1 equals `{first_name_initial}`)
 - `{last_name}` - User's full last name
 - `{last_name_initial}` - First letter of last name
+- `{last_name:N}` - First N characters of last name
 
 **Examples:**
 
@@ -502,6 +504,9 @@ Template for auto-generating usernames. Spaces and hyphens in names are automati
 | `{first_name_initial}{last_name_initial}` | js | jd |
 | `{first_name_initial}.{last_name}` | j.smith | j.dubois |
 | `{last_name}-{first_name}` | smith-john | dubois-jeanpaul |
+| `{first_name:3}{last_name:5}` | johsmith | jeaduboi |
+
+If N is greater than the name's length the whole name is used.
 
 **Note:** All generated usernames are automatically converted to lowercase and ASCII.
 

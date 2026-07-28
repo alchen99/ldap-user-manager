@@ -1335,6 +1335,80 @@ function ldap_change_password($ldap_connection,$username,$new_password) {
 
 ##################################
 
+function ldap_schema_objectclass_definitions($ldap_connection) {
+
+ # Return (and cache) the raw objectClass definition strings from the directory's subschema.
+
+ global $log_prefix, $LDAP, $LDAP_DEBUG;
+
+ if (isset($LDAP['schema_objectclass_definitions'])) { return $LDAP['schema_objectclass_definitions']; }
+ $LDAP['schema_objectclass_definitions'] = array();
+
+ $schema_base_query = @ ldap_read($ldap_connection, "", "subschemaSubentry=*", array('subschemaSubentry'));
+ if ($schema_base_query) {
+   $schema_base_results = @ ldap_get_entries($ldap_connection, $schema_base_query);
+   if (!empty($schema_base_results[0]['subschemasubentry'][0])) {
+     $schema_base_dn = $schema_base_results[0]['subschemasubentry'][0];
+     $objclass_query = @ ldap_read($ldap_connection, $schema_base_dn, "(objectClasses=*)", array('objectClasses'));
+     if ($objclass_query) {
+       $objclass_results = @ ldap_get_entries($ldap_connection, $objclass_query);
+       if (isset($objclass_results[0]['objectclasses'])) {
+         $defs = $objclass_results[0]['objectclasses'];
+         unset($defs['count']);
+         $LDAP['schema_objectclass_definitions'] = array_values($defs);
+       }
+     }
+   }
+ }
+
+ if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Schema: cached " . count($LDAP['schema_objectclass_definitions']) . " objectClass definitions",0); }
+ return $LDAP['schema_objectclass_definitions'];
+
+}
+
+##################################
+
+function ldap_auxiliary_class_for_attribute($ldap_connection, $attribute) {
+
+ # Return an AUXILIARY objectClass whose MUST/MAY permits $attribute, or NULL if none does
+ # (e.g. sshPublicKey -> ldapPublicKey). Used to fix "attribute not allowed" on write.
+
+ global $log_prefix, $LDAP_DEBUG;
+
+ $attribute = strtolower(trim($attribute));
+ if ($attribute == '') { return NULL; }
+
+ foreach (ldap_schema_objectclass_definitions($ldap_connection) as $definition) {
+
+   if (!preg_match('/\bAUXILIARY\b/i', $definition)) { continue; }
+
+   $permitted = array();
+   foreach (array('MUST', 'MAY') as $kind) {
+     if (preg_match('/\b' . $kind . '\s+(?:\(\s*([^)]*?)\s*\)|([A-Za-z0-9.\-;]+))/i', $definition, $m)) {
+       $list = (isset($m[1]) and $m[1] !== '') ? $m[1] : (isset($m[2]) ? $m[2] : '');
+       foreach (preg_split('/[\s\$]+/', $list) as $a) {
+         $a = strtolower(trim($a));
+         if ($a !== '') { $permitted[] = $a; }
+       }
+     }
+   }
+
+   if (in_array($attribute, $permitted)) {
+     # An objectClass NAME may be a single 'name' or a list ( 'name1' 'name2' ) - take the first.
+     if (preg_match("/NAME\s+\(\s*'([^']+)'/i", $definition, $m) or preg_match("/NAME\s+'([^']+)'/i", $definition, $m)) {
+       if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Schema: attribute '$attribute' is provided by auxiliary objectClass '{$m[1]}'",0); }
+       return $m[1];
+     }
+   }
+
+ }
+
+ return NULL;
+
+}
+
+##################################
+
 function ldap_detect_rfc2307bis($ldap_connection) {
 
   global $log_prefix, $LDAP, $LDAP_DEBUG;

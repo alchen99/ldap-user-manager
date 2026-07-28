@@ -176,17 +176,25 @@ Use placeholders in the `USERNAME_FORMAT` variable:
 # jsmith
 -e USERNAME_FORMAT="{first_name:1}{last_name}"
 
+# johsmith (first 3 of given name + first 5 of surname)
+-e USERNAME_FORMAT="{first_name:3}{last_name:5}"
+
 # smith (surname only)
 -e USERNAME_FORMAT="{last_name}"
 ```
 
 ### Available Placeholders
 
-| Placeholder | Description | Example |
+| Placeholder | Description | Example (John Smith) |
 |-------------|-------------|---------|
-| `{first_name}` | User's first name | john |
-| `{last_name}` | User's last name | smith |
-| `{email_address}` | Email address | john.smith@example.com |
+| `{first_name}` | Full first name | john |
+| `{last_name}` | Full last name | smith |
+| `{first_name_initial}` | First letter of the first name | j |
+| `{last_name_initial}` | First letter of the last name | s |
+| `{first_name:N}` | First N characters of the first name (N=1 equals `{first_name_initial}`) | `{first_name:3}` -> joh |
+| `{last_name:N}` | First N characters of the last name | `{last_name:2}` -> sm |
+
+If N is greater than the name's length the whole name is used. Names are lower-cased, stripped of spaces and hyphens, and de-accented for POSIX/LDAP compatibility before the placeholders are applied.
 
 ### Custom Validation
 
@@ -322,14 +330,23 @@ Binary attributes (like photos) are not currently supported through the web inte
 
 ## Website Customisation
 
+`CUSTOM_LOGO` and `CUSTOM_STYLES` are **URL paths**, not container filesystem paths. Their
+values are placed verbatim into the page as `<img src="...">` and `<link href="...">`, so the
+browser fetches them relative to the site root. The referenced files must therefore live inside
+the document root (`/opt/luminary`) so the web server can serve them, and the variable is the URL
+under that root (with a leading slash) — not the mount path.
+
+For example, a file bind-mounted to `/opt/luminary/logo.png` is served at the URL `/logo.png`,
+so you set `CUSTOM_LOGO=/logo.png`.
+
 ### Custom Logo
 
 Replace the default logo with your organisation's branding:
 
 ```bash
 docker run \
-  -v /path/to/logo.png:/custom/logo.png:ro \
-  -e CUSTOM_LOGO=/custom/logo.png \
+  -v /path/to/logo.png:/opt/luminary/logo.png:ro \
+  -e CUSTOM_LOGO=/logo.png \
   wheelybird/luminary
 ```
 
@@ -337,13 +354,30 @@ docker run \
 
 ### Custom CSS
 
-Add custom styling to match your corporate identity:
+Add custom styling to match your corporate identity. The image already ships a default
+`custom.css` at `/opt/luminary/custom.css` (served at `/custom.css`); bind-mount your own file
+over it, or mount to any other path inside `/opt/luminary` and point `CUSTOM_STYLES` at the
+matching URL:
 
 ```bash
 docker run \
-  -v /path/to/custom.css:/custom/styles.css:ro \
-  -e CUSTOM_STYLES=/custom/styles.css \
+  -v /path/to/custom.css:/opt/luminary/custom.css:ro \
+  -e CUSTOM_STYLES=/custom.css \
   wheelybird/luminary
+```
+
+The equivalent in a Docker Compose file:
+
+```yaml
+services:
+  luminary:
+    image: wheelybird/luminary
+    volumes:
+      - ./style/custom.css:/opt/luminary/custom.css:ro
+      - ./style/logo.png:/opt/luminary/logo.png:ro
+    environment:
+      - CUSTOM_STYLES=/custom.css
+      - CUSTOM_LOGO=/logo.png
 ```
 
 **Example custom.css**:

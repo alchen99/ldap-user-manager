@@ -26,6 +26,34 @@ require_once "ldap_app_data_functions.inc.php";
 require_once "rate_limit_functions.inc.php";
 
 /**
+ * Hostname for the password reset link: the request host only when it matches SERVER_HOSTNAME
+ * or PASSWORD_RESET_ALLOWED_HOSTS, else SERVER_HOSTNAME. The allowlist is what stops reset
+ * poisoning (CWE-640) - an unchecked HTTP_HOST must never reach the link.
+ *
+ * @return string Hostname (possibly host:port) safe to place in the reset URL
+ */
+function password_reset_link_host() {
+
+  global $SERVER_HOSTNAME, $PASSWORD_RESET_ALLOWED_HOSTS;
+
+  $request_host = isset($_SERVER['HTTP_HOST']) ? trim($_SERVER['HTTP_HOST']) : '';
+  if ($request_host === '') { return $SERVER_HOSTNAME; }
+
+  $allowed_hosts = array($SERVER_HOSTNAME);
+  if (isset($PASSWORD_RESET_ALLOWED_HOSTS) && is_array($PASSWORD_RESET_ALLOWED_HOSTS)) {
+    $allowed_hosts = array_merge($allowed_hosts, $PASSWORD_RESET_ALLOWED_HOSTS);
+  }
+  $allowed_hosts = array_map('strtolower', array_map('trim', $allowed_hosts));
+
+  if (in_array(strtolower($request_host), $allowed_hosts, TRUE)) {
+    return $request_host;
+  }
+
+  return $SERVER_HOSTNAME;
+
+}
+
+/**
  * Generate a password reset token
  *
  * @param resource $ldap_connection LDAP connection resource

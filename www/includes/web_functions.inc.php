@@ -867,14 +867,17 @@ function remove_accents($str) {
  * Supported template variables:
  *   {first_name}          - Full first name
  *   {first_name_initial}  - First letter of first name
+ *   {first_name:N}        - First N characters of first name (N=1 equals {first_name_initial})
  *   {last_name}           - Full last name
  *   {last_name_initial}   - First letter of last name
+ *   {last_name:N}         - First N characters of last name
  *
  * Examples:
  *   {first_name_initial}{last_name}       -> jsmith (for John Smith)
  *   {last_name}{first_name_initial}       -> smithj
  *   {first_name_initial}{last_name_initial} -> js
  *   {first_name}.{last_name}              -> john.smith
+ *   {first_name:3}{last_name:2}           -> johsm
  *
  * Note: Automatically removes spaces and hyphens from compound names (Jean-Paul -> jeanpaul)
  *       ALWAYS removes accents for POSIX compatibility (Hæppy Testør -> haeppy testor)
@@ -900,6 +903,15 @@ function generate_username($fn,$ln) {
   $ln_clean = remove_accents($ln_clean);
 
   $username = $USERNAME_FORMAT;
+
+  // {first_name:N}/{last_name:N} first N chars; must run before the plain {first_name}/{last_name}.
+  $username = preg_replace_callback('/\{first_name:(\d+)\}/', function($m) use ($fn_clean) {
+    return strtolower(mb_substr($fn_clean, 0, (int)$m[1]));
+  }, $username);
+  $username = preg_replace_callback('/\{last_name:(\d+)\}/', function($m) use ($ln_clean) {
+    return strtolower(mb_substr($ln_clean, 0, (int)$m[1]));
+  }, $username);
+
   $username = str_replace('{first_name}',strtolower($fn_clean), $username);
   $username = str_replace('{first_name_initial}',strtolower(mb_substr($fn_clean, 0, 1)), $username);
   $username = str_replace('{last_name}',strtolower($ln_clean), $username);
@@ -967,6 +979,14 @@ function render_js_username_generator($firstname_field_id,$lastname_field_id,$us
 
   var template = '$USERNAME_FORMAT';
   var actual_username = template;
+
+  // {first_name:N}/{last_name:N} first N chars; before the plain replacements, per generate_username().
+  actual_username = actual_username.replace(/\{first_name:(\d+)\}/g, function(match, n) {
+    return first_name_clean.substring(0, parseInt(n, 10)).toLowerCase();
+  });
+  actual_username = actual_username.replace(/\{last_name:(\d+)\}/g, function(match, n) {
+    return last_name_clean.substring(0, parseInt(n, 10)).toLowerCase();
+  });
 
   actual_username = actual_username.replace('{first_name}', first_name_clean.toLowerCase());
   actual_username = actual_username.replace('{first_name_initial}', first_name_clean.charAt(0).toLowerCase());

@@ -66,7 +66,7 @@ foreach ($USER_EDITABLE_ATTRIBUTES as $attr) {
 // Load current user's LDAP entry
 $user_search = ldap_search($ldap_connection, $LDAP['user_dn'],
   "({$LDAP['account_attribute']}=" . ldap_escape($USER_ID, "", LDAP_ESCAPE_FILTER) . ")",
-  array_merge(array('dn', 'cn', 'givenname', 'sn'), array_keys($attribute_map)));
+  array_merge(array('dn', 'cn', 'givenname', 'sn', 'objectclass'), array_keys($attribute_map)));
 
 if (!$user_search) {
   render_alert_banner("Failed to load user profile.", "danger", 15000);
@@ -113,12 +113,14 @@ foreach ($attribute_map as $attribute => $attr_config) {
         $upload_error = "Profile photo must be a JPEG image. Uploaded file type: " . htmlspecialchars($mime_type);
       }
 
-      // Verify it's actually a valid JPEG by attempting to load it
-      $image_check = @imagecreatefromjpeg($_FILES[$attribute]['tmp_name']);
-      if ($image_check === false) {
-        $upload_error = "The uploaded file is not a valid JPEG image.";
-      } else {
-        imagedestroy($image_check);
+      // Guarded: a GD build without JPEG support would fatally crash here; the finfo check above suffices.
+      if (function_exists('imagecreatefromjpeg')) {
+        $image_check = @imagecreatefromjpeg($_FILES[$attribute]['tmp_name']);
+        if ($image_check === false) {
+          $upload_error = "The uploaded file is not a valid JPEG image.";
+        } else {
+          imagedestroy($image_check);
+        }
       }
 
       if ($upload_error) {
@@ -191,8 +193,30 @@ if (isset($_POST['update_profile'])) {
   if ($security_violation) {
     render_alert_banner("Security violation: You cannot edit that attribute.", "danger", 15000);
   } elseif (!empty($to_update)) {
+
     // Perform LDAP update
     $updated_profile = @ldap_mod_replace($ldap_connection, $dn, $to_update);
+
+    // On failure, add the auxiliary object class that permits each attribute (e.g. sshPublicKey
+    // needs ldapPublicKey) and retry, rather than special-casing individual attributes.
+    if (!$updated_profile && !isset($to_update['objectclass'])) {
+      $existing_classes = isset($user[0]['objectclass']) ? $user[0]['objectclass'] : array();
+      unset($existing_classes['count']);
+      $existing_classes = array_values($existing_classes);
+      $have_classes = array_map('strtolower', $existing_classes);
+      $classes_to_add = array();
+      foreach ($to_update as $attr => $vals) {
+        if (empty($vals)) { continue; } // attribute deletions never need a new object class
+        $aux_class = ldap_auxiliary_class_for_attribute($ldap_connection, $attr);
+        if ($aux_class && !in_array(strtolower($aux_class), array_merge($have_classes, array_map('strtolower', $classes_to_add)))) {
+          $classes_to_add[] = $aux_class;
+        }
+      }
+      if (!empty($classes_to_add)) {
+        $to_update['objectclass'] = array_merge($existing_classes, $classes_to_add);
+        $updated_profile = @ldap_mod_replace($ldap_connection, $dn, $to_update);
+      }
+    }
 
     if ($updated_profile) {
       render_alert_banner("Profile updated successfully.");
@@ -253,6 +277,11 @@ if (isset($user[0]['cn'][0])) {
           <p class="text-center">No editable attributes are configured. Contact your administrator to enable user profile editing.</p>
         </div>
       <?php } else { ?>
+
+        <?php
+          // Defines add_field_to(); must precede the fields so pre-existing values render too (#264).
+          render_dynamic_field_js();
+        ?>
 
         <form method="post" enctype="multipart/form-data">
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **[#268](https://github.com/wheelybird/luminary/issues/268)** - Saving a group's description (or any attribute) from the Attributes tab no longer removes the group's members. The Attributes tab now has its own handler (`group_attributes_handler.php`) and form marker, so attribute updates and membership changes are fully independent operations.
+- **[#264](https://github.com/wheelybird/luminary/issues/264)** - Users can now add SSH keys on the self-service "My profile" page. The "+" button did nothing because the page was missing the JavaScript (`add_field_to()`) the admin user pages already include. Saving a key also failed with an "object class violation" because the user's entry lacked the `ldapPublicKey` object class the `sshPublicKey` attribute requires; the profile save now detects this generically — for any editable attribute the entry's current object classes don't permit, it looks up the auxiliary object class that provides the attribute (from the directory schema), adds it, and retries — rather than special-casing individual attributes.
+- Login MFA page: the verification code input is no longer full-width — it is now capped to suit a 6-digit code, sitting alongside its label.
+- Self-service profile: uploading a JPEG profile photo no longer crashes with "Call to undefined function `imagecreatefromjpeg()`". The Docker image now builds the GD extension with JPEG support (`--with-jpeg`), and the upload validation degrades gracefully (relying on the independent MIME-type check) when GD lacks JPEG support instead of throwing a fatal error.
+
+- The **Password reset** configuration category was missing from the config registry's category list, so all of its settings (`PASSWORD_RESET_*` and `USE_LDAP_AS_DB`) were silently absent from the System Config page and the generated documentation. The category has been added, making these settings visible in both.
+
+### Documentation
+
+- **[#267](https://github.com/wheelybird/luminary/issues/267)** - Corrected the website customisation instructions. `CUSTOM_LOGO` and `CUSTOM_STYLES` are URL paths (emitted verbatim as `<img src>` / `<link href>`), so the referenced files must be mounted inside the document root (`/opt/luminary`) and the variable set to the matching URL — the previous `/custom/...` example mounted outside the document root and could not be served. Added a Docker Compose example and clarified the registry help text for both variables.
+
+### Added
+
+- **[#266](https://github.com/wheelybird/luminary/issues/266)** - New `PASSWORD_RESET_ALLOWED_HOSTS` setting. The password reset link normally always points at `SERVER_HOSTNAME`; for instances reachable under more than one name, this optional allowlist lets the link follow the actual request host when it matches an allowed hostname, falling back to `SERVER_HOSTNAME` otherwise. The allowlist is the security boundary — an unlisted request host is never used — which prevents password reset poisoning (CWE-640).
+- **[#265](https://github.com/wheelybird/luminary/issues/265)** - `USERNAME_FORMAT` now supports `{first_name:N}` and `{last_name:N}` placeholders, which take the first N characters of a name (e.g. `{first_name:3}{last_name:5}` gives `johsmith` for John Smith). `{first_name_initial}` is the N=1 case, so existing formats are unchanged. The live username preview on the create-user form matches. If N exceeds the name length, the whole name is used.
+- **[#269](https://github.com/wheelybird/luminary/issues/269)** - New `USER_EDITABLE_ATTRIBUTES_DISABLED` flag. When enabled, no attributes are user-editable regardless of `USER_EDITABLE_ATTRIBUTES`, and the "My profile" item is removed from the menu entirely (the page also remains read-only and enforces this server-side if reached directly). Because setting `USER_EDITABLE_ATTRIBUTES` to an empty value falls back to the built-in defaults, this flag is the way to disable profile editing entirely.
+
 ## [2.2.0] - 2026-07-13
 
 ### Security

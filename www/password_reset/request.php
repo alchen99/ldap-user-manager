@@ -73,8 +73,8 @@ if (isset($_POST['request_reset'])) {
         $token = password_reset_generate_token($ldap_connection, $username, $user_mail);
 
         if ($token !== FALSE) {
-          // Build reset URL
-          $reset_url = "{$SITE_PROTOCOL}{$SERVER_HOSTNAME}{$SERVER_PATH}password_reset/reset.php?token={$token}&user={$username}";
+          $reset_host = password_reset_link_host();
+          $reset_url = "{$SITE_PROTOCOL}{$reset_host}{$SERVER_PATH}password_reset/reset.php?token={$token}&user={$username}";
 
           // Get token expiry in minutes
           $expiry_minutes = isset($PASSWORD_RESET_TOKEN_EXPIRY_MINUTES) ? $PASSWORD_RESET_TOKEN_EXPIRY_MINUTES : 60;

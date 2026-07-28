@@ -63,6 +63,12 @@ $CONFIG_CATEGORIES = array(
     'order' => 7,
     'icon' => 'bi-shield-check'
   ),
+  'password_reset' => array(
+    'name' => 'Password reset',
+    'description' => 'Self-service password reset settings',
+    'order' => 7,
+    'icon' => 'bi-key'
+  ),
   'audit' => array(
     'name' => 'Audit logging',
     'description' => 'Audit trail and activity logging configuration (optional)',
@@ -273,7 +279,7 @@ $CONFIG_REGISTRY = array(
   'USERNAME_FORMAT' => array(
     'category' => 'user_defaults',
     'description' => 'Username format template',
-    'help' => 'Template variables: {first_name}, {last_name}, {first_name_initial}, {last_name_initial}',
+    'help' => 'Template variables: {first_name}, {last_name}, {first_name_initial}, {last_name_initial}, {first_name:N}, {last_name:N} (first N characters, e.g. {first_name:3}{last_name:5})',
     'type' => 'string',
     'default' => '{first_name}-{last_name}',
     'mandatory' => false,
@@ -571,6 +577,17 @@ $CONFIG_REGISTRY = array(
     'variable' => '$PASSWORD_RESET_LOCKOUT_DURATION_MINUTES'
   ),
 
+  'PASSWORD_RESET_ALLOWED_HOSTS' => array(
+    'category' => 'password_reset',
+    'description' => 'Additional hosts for the reset link',
+    'help' => 'Comma-separated list of additional hostnames (optionally with a port, e.g. vpn.example.com:9443) under which the password reset link may follow the actual request host instead of SERVER_HOSTNAME. Only hosts in this list, plus SERVER_HOSTNAME, are ever used; any other request host falls back to SERVER_HOSTNAME. This allowlist is what prevents password reset poisoning (CWE-640), so leave it empty unless the instance is genuinely reachable under more than one name.',
+    'type' => 'array',
+    'default' => array(),
+    'mandatory' => false,
+    'env_var' => 'PASSWORD_RESET_ALLOWED_HOSTS',
+    'variable' => '$PASSWORD_RESET_ALLOWED_HOSTS'
+  ),
+
   // ===== User Profile Settings =====
 
   'USER_EDITABLE_ATTRIBUTES' => array(
@@ -590,6 +607,17 @@ $CONFIG_REGISTRY = array(
     'mandatory' => false,
     'env_var' => 'USER_EDITABLE_ATTRIBUTES',
     'variable' => '$USER_EDITABLE_ATTRIBUTES'
+  ),
+
+  'USER_EDITABLE_ATTRIBUTES_DISABLED' => array(
+    'category' => 'user_profile',
+    'description' => 'Disable user-editable attributes',
+    'help' => 'When enabled, users cannot edit any of their profile attributes, regardless of USER_EDITABLE_ATTRIBUTES. The profile page becomes read-only. Use this when you want no self-service attribute editing at all.',
+    'type' => 'boolean',
+    'default' => false,
+    'mandatory' => false,
+    'env_var' => 'USER_EDITABLE_ATTRIBUTES_DISABLED',
+    'variable' => '$USER_EDITABLE_ATTRIBUTES_DISABLED'
   ),
 
   'ATTRIBUTE_BLACKLIST' => array(
@@ -857,8 +885,8 @@ $CONFIG_REGISTRY = array(
 
   'CUSTOM_LOGO' => array(
     'category' => 'interface',
-    'description' => 'Custom logo path',
-    'help' => 'Path to custom logo file',
+    'description' => 'Custom logo URL path',
+    'help' => 'URL path to a custom logo (used verbatim as an <img> src, so the file must be served from within the document root /opt/luminary). For example, mount your logo to /opt/luminary/logo.png and set this to /logo.png',
     'type' => 'string',
     'default' => false,
     'mandatory' => false,
@@ -868,8 +896,8 @@ $CONFIG_REGISTRY = array(
 
   'CUSTOM_STYLES' => array(
     'category' => 'interface',
-    'description' => 'Custom CSS path',
-    'help' => 'Path to custom stylesheet',
+    'description' => 'Custom CSS URL path',
+    'help' => 'URL path to a custom stylesheet (used verbatim as a <link> href, so the file must be served from within the document root /opt/luminary). A default custom.css ships at /opt/luminary/custom.css; mount your own over it and set this to /custom.css',
     'type' => 'string',
     'default' => false,
     'mandatory' => false,
@@ -1412,6 +1440,17 @@ $PASSWORD_RESET_RATE_LIMIT_WINDOW_MINUTES = (is_numeric(getenv('PASSWORD_RESET_R
 $PASSWORD_RESET_MAX_ATTEMPTS = (is_numeric(getenv('PASSWORD_RESET_MAX_ATTEMPTS')) ? (int)getenv('PASSWORD_RESET_MAX_ATTEMPTS') : get_config_default('PASSWORD_RESET_MAX_ATTEMPTS'));
 $PASSWORD_RESET_LOCKOUT_DURATION_MINUTES = (is_numeric(getenv('PASSWORD_RESET_LOCKOUT_DURATION_MINUTES')) ? (int)getenv('PASSWORD_RESET_LOCKOUT_DURATION_MINUTES') : get_config_default('PASSWORD_RESET_LOCKOUT_DURATION_MINUTES'));
 
+// Additional hostnames the reset link may follow the request host for (see #266).
+if (getenv('PASSWORD_RESET_ALLOWED_HOSTS')) {
+  $PASSWORD_RESET_ALLOWED_HOSTS = array();
+  foreach (explode(',', getenv('PASSWORD_RESET_ALLOWED_HOSTS')) as $allowed_host) {
+    $allowed_host = trim($allowed_host);
+    if ($allowed_host != '') { $PASSWORD_RESET_ALLOWED_HOSTS[] = $allowed_host; }
+  }
+} else {
+  $PASSWORD_RESET_ALLOWED_HOSTS = get_config_default('PASSWORD_RESET_ALLOWED_HOSTS');
+}
+
 ##############################################################################
 # User Profile Settings
 ##############################################################################
@@ -1430,6 +1469,12 @@ if (getenv('USER_EDITABLE_ATTRIBUTES')) {
   $USER_EDITABLE_ATTRIBUTES = get_config_default('USER_EDITABLE_ATTRIBUTES');
 }
 
+// Empties the editable list (an empty USER_EDITABLE_ATTRIBUTES would fall back to defaults) (#269).
+$USER_EDITABLE_ATTRIBUTES_DISABLED = (env_is_true('USER_EDITABLE_ATTRIBUTES_DISABLED') ? TRUE : get_config_default('USER_EDITABLE_ATTRIBUTES_DISABLED'));
+if ($USER_EDITABLE_ATTRIBUTES_DISABLED) {
+  $USER_EDITABLE_ATTRIBUTES = array();
+}
+
 // Security blacklist: Attributes that users must NEVER be allowed to edit
 $ATTRIBUTE_BLACKLIST = get_config_default('ATTRIBUTE_BLACKLIST');
 
@@ -1437,7 +1482,8 @@ $ATTRIBUTE_BLACKLIST = get_config_default('ATTRIBUTE_BLACKLIST');
  * Check if an attribute is safe for users to edit
  */
 function is_user_editable($attribute) {
-  global $ATTRIBUTE_BLACKLIST, $USER_EDITABLE_ATTRIBUTES;
+  global $ATTRIBUTE_BLACKLIST, $USER_EDITABLE_ATTRIBUTES, $USER_EDITABLE_ATTRIBUTES_DISABLED;
+  if ($USER_EDITABLE_ATTRIBUTES_DISABLED) { return FALSE; }
   $attribute_lower = strtolower(trim($attribute));
   if ($attribute_lower == '') { return FALSE; }
   if (in_array($attribute_lower, array_map('strtolower', $ATTRIBUTE_BLACKLIST))) { return FALSE; }

@@ -40,4 +40,9 @@ if (!$REMOTE_HTTP_HEADERS_LOGIN) {
   $MODULES['log_out'] = 'auth';
 }
 
+# Hide the profile page when there's nothing to edit (#269).
+if (empty($USER_EDITABLE_ATTRIBUTES)) {
+  unset($MODULES['user_profile']);
+}
+
 ?>

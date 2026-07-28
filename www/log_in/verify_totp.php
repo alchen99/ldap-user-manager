@@ -133,11 +133,14 @@ render_header("$ORGANISATION_NAME account manager - Verify MFA");
 
    <form class="form-horizontal" action="" method="post">
 
-    <div class="row mb-3">
-     <label for="totp_code" class="col-sm-4 col-form-label text-end">Verification Code</label>
-     <div class="col-sm-8">
+    <div class="row mb-3 align-items-center">
+     <div class="col text-end">
+      <label for="totp_code" class="col-form-label mb-0">Verification Code</label>
+     </div>
+     <div class="col-auto">
       <input type="text"
              class="form-control form-control-lg text-center"
+             style="max-width: 10rem;"
              id="totp_code"
              name="totp_code"
              maxlength="6"
@@ -146,6 +149,12 @@ render_header("$ORGANISATION_NAME account manager - Verify MFA");
              autocomplete="one-time-code"
              autofocus
              required>
+     </div>
+     <div class="col"></div>
+    </div>
+
+    <div class="row mb-3">
+     <div class="col-12 text-center">
       <small class="form-text text-muted">Enter the 6-digit code from your app</small>
      </div>
     </div>

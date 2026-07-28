@@ -13,6 +13,7 @@ To update this file, run: `php docs/generate_config_docs.php`
 - [Email settings](#email-settings)
 - [Interface & branding](#interface-&-branding)
 - [Session & security](#session-&-security)
+- [Password reset](#password-reset)
 - [Audit logging 🔧](#audit-logging)
 - [Password policy 🔧](#password-policy)
 - [Account lifecycle 🔧](#account-lifecycle)
@@ -172,7 +173,7 @@ Default values and behaviour for new user accounts
 |--------------|------|---------|---------------------|-------------|
 | Default primary group for new users<br><small>Group name that new users will be added to</small> | string | 📝 `everybody` | `DEFAULT_USER_GROUP` | Default primary group for new users |
 | Default login shell for new users<br><small>Full path to shell binary</small> | string | 📝 `/bin/bash` | `DEFAULT_USER_SHELL` | Default login shell for new users |
-| Username format template<br><small>Template variables: {first_name}, {last_name}, {first_name_initial}, {last_name_initial}</small> | string | 📝 `{first_name}-{last_name}` | `USERNAME_FORMAT` | Username format template |
+| Username format template<br><small>Template variables: {first_name}, {last_name}, {first_name_initial}, {last_name_initial}, {first_name:N}, {last_name:N} (first N characters, e.g. {first_name:3}{last_name:5})</small> | string | 📝 `{first_name}-{last_name}` | `USERNAME_FORMAT` | Username format template |
 | Regular expression for username validation<br><small>Usernames must match this pattern</small> | string | 📝 `^[\p{L}\p{N}_.-]{2,64}$` | `USERNAME_REGEX` | Regular expression for username validation |
 | Enforce username validation rules<br><small>Validate usernames against USERNAME_REGEX</small> | ✅ boolean | `TRUE` | `ENFORCE_USERNAME_VALIDATION` | Enforce username validation rules |
 | Allow weak passwords<br><small>Skip password strength requirement (not recommended)</small> | ✅ boolean | `FALSE` | `ACCEPT_WEAK_PASSWORDS` | Allow weak passwords |
@@ -204,7 +205,7 @@ Full path to shell binary
 
 #### Username format template
 
-Template variables: {first_name}, {last_name}, {first_name_initial}, {last_name_initial}
+Template variables: {first_name}, {last_name}, {first_name_initial}, {last_name_initial}, {first_name:N}, {last_name:N} (first N characters, e.g. {first_name:3}{last_name:5})
 
 **Environment Variable:** `USERNAME_FORMAT`
 
@@ -418,6 +419,7 @@ Self-service user profile and editable attributes
 | Configuration | Type | Default | Environment Variable | Description |
 |--------------|------|---------|---------------------|-------------|
 | User-editable attributes<br><small>Comma-separated list of LDAP attributes users can edit in their profile. If not set, a sensible default list is used.</small> | 🔢 array | `telephonenumber`, `mobile`, `displayname`, ... | `USER_EDITABLE_ATTRIBUTES` | User-editable attributes |
+| Disable user-editable attributes<br><small>When enabled, users cannot edit any of their profile attributes, regardless of USER_EDITABLE_ATTRIBUTES. The profile page becomes read-only. Use this when you want no self-service attribute editing at all.</small> | ✅ boolean | `FALSE` | `USER_EDITABLE_ATTRIBUTES_DISABLED` | Disable user-editable attributes |
 | Security blacklist of non-editable attributes<br><small>Attributes that users must NEVER be allowed to edit</small> | 🔢 array | `dn`, `uid`, `cn`, ... | - | Security blacklist of non-editable attributes |
 
 ### Details
@@ -429,6 +431,16 @@ Comma-separated list of LDAP attributes users can edit in their profile. If not 
 **Environment Variable:** `USER_EDITABLE_ATTRIBUTES`
 
 **Default:** `telephonenumber, mobile, displayname, description, title, jpegphoto, sshpublickey`
+
+---
+
+#### Disable user-editable attributes
+
+When enabled, users cannot edit any of their profile attributes, regardless of USER_EDITABLE_ATTRIBUTES. The profile page becomes read-only. Use this when you want no self-service attribute editing at all.
+
+**Environment Variable:** `USER_EDITABLE_ATTRIBUTES_DISABLED`
+
+**Default:** `FALSE`
 
 ---
 
@@ -614,8 +626,8 @@ Customisation, branding, and user interface settings
 | Server path<br><small>Base path for the application (e.g., /luminary/)</small> | string | 📝 `/` | `SERVER_PATH` | Server path |
 | Login field label<br><small>Label for login form username field</small> | string | 📝 `Username` | `SITE_LOGIN_FIELD_LABEL` | Login field label |
 | LDAP attribute for login<br><small>Which attribute to use for login authentication</small> | string | 📝 `uid` | `SITE_LOGIN_LDAP_ATTRIBUTE` | LDAP attribute for login |
-| Custom logo path<br><small>Path to custom logo file</small> | string | `FALSE` | `CUSTOM_LOGO` | Custom logo path |
-| Custom CSS path<br><small>Path to custom stylesheet</small> | string | `FALSE` | `CUSTOM_STYLES` | Custom CSS path |
+| Custom logo URL path<br><small>URL path to a custom logo (used verbatim as an <img> src, so the file must be served from within the document root /opt/luminary). For example, mount your logo to /opt/luminary/logo.png and set this to /logo.png</small> | string | `FALSE` | `CUSTOM_LOGO` | Custom logo URL path |
+| Custom CSS URL path<br><small>URL path to a custom stylesheet (used verbatim as a <link> href, so the file must be served from within the document root /opt/luminary). A default custom.css ships at /opt/luminary/custom.css; mount your own over it and set this to /custom.css</small> | string | `FALSE` | `CUSTOM_STYLES` | Custom CSS URL path |
 | Items per page for listing pages<br><small>Number of users/groups to show per page in account_manager lists</small> | integer | 📝 `50` | `PAGINATION_ITEMS_PER_PAGE` | Items per page for listing pages |
 | Show "Powered by Luminary" footer<br><small>Display a small attribution footer linking to the Luminary project</small> | ✅ boolean | `TRUE` | `SHOW_POWERED_BY` | Show "Powered by Luminary" footer |
 
@@ -681,9 +693,9 @@ Which attribute to use for login authentication
 
 ---
 
-#### Custom logo path
+#### Custom logo URL path
 
-Path to custom logo file
+URL path to a custom logo (used verbatim as an <img> src, so the file must be served from within the document root /opt/luminary). For example, mount your logo to /opt/luminary/logo.png and set this to /logo.png
 
 **Environment Variable:** `CUSTOM_LOGO`
 
@@ -691,9 +703,9 @@ Path to custom logo file
 
 ---
 
-#### Custom CSS path
+#### Custom CSS URL path
 
-Path to custom stylesheet
+URL path to a custom stylesheet (used verbatim as a <link> href, so the file must be served from within the document root /opt/luminary). A default custom.css ships at /opt/luminary/custom.css; mount your own over it and set this to /custom.css
 
 **Environment Variable:** `CUSTOM_STYLES`
 
@@ -761,6 +773,104 @@ Login using HTTP headers (e.g., from reverse proxy)
 **Environment Variable:** `REMOTE_HTTP_HEADERS_LOGIN`
 
 **Default:** `FALSE`
+
+---
+
+
+## Password reset
+
+Self-service password reset settings
+
+| Configuration | Type | Default | Environment Variable | Description |
+|--------------|------|---------|---------------------|-------------|
+| Enable self-service password reset<br><small>Allows users to reset forgotten passwords via email verification</small> | ✅ boolean | `FALSE` | `PASSWORD_RESET_ENABLED` | Enable self-service password reset |
+| Store persistent data in LDAP<br><small>Store password reset tokens, sessions, and other persistent data in LDAP instead of /tmp. Prevents data loss on ephemeral container restarts and enables horizontal scaling. Requires cn=luminary,ou=applications entry (can be created via admin UI).</small> | ✅ boolean | `FALSE` | `USE_LDAP_AS_DB` | Store persistent data in LDAP |
+| Password reset token expiry time<br><small>Minutes until reset link expires</small> | integer | 📝 `60` | `PASSWORD_RESET_TOKEN_EXPIRY_MINUTES` | Password reset token expiry time |
+| Maximum reset requests per time window<br><small>Maximum number of reset requests allowed per email address</small> | integer | 📝 `3` | `PASSWORD_RESET_RATE_LIMIT_REQUESTS` | Maximum reset requests per time window |
+| Rate limit time window<br><small>Time window for rate limiting (minutes)</small> | integer | 📝 `60` | `PASSWORD_RESET_RATE_LIMIT_WINDOW_MINUTES` | Rate limit time window |
+| Maximum failed validation attempts<br><small>Failed attempts before account lockout</small> | integer | 📝 `5` | `PASSWORD_RESET_MAX_ATTEMPTS` | Maximum failed validation attempts |
+| Account lockout duration<br><small>Minutes to lock account after max failed attempts</small> | integer | 📝 `60` | `PASSWORD_RESET_LOCKOUT_DURATION_MINUTES` | Account lockout duration |
+| Additional hosts for the reset link<br><small>Comma-separated list of additional hostnames (optionally with a port, e.g. vpn.example.com:9443) under which the password reset link may follow the actual request host instead of SERVER_HOSTNAME. Only hosts in this list, plus SERVER_HOSTNAME, are ever used; any other request host falls back to SERVER_HOSTNAME. This allowlist is what prevents password reset poisoning (CWE-640), so leave it empty unless the instance is genuinely reachable under more than one name.</small> | 🔢 array | `[]` (empty) | `PASSWORD_RESET_ALLOWED_HOSTS` | Additional hosts for the reset link |
+
+### Details
+
+#### Enable self-service password reset
+
+Allows users to reset forgotten passwords via email verification
+
+**Environment Variable:** `PASSWORD_RESET_ENABLED`
+
+**Default:** `FALSE`
+
+---
+
+#### Store persistent data in LDAP
+
+Store password reset tokens, sessions, and other persistent data in LDAP instead of /tmp. Prevents data loss on ephemeral container restarts and enables horizontal scaling. Requires cn=luminary,ou=applications entry (can be created via admin UI).
+
+**Environment Variable:** `USE_LDAP_AS_DB`
+
+**Default:** `FALSE`
+
+---
+
+#### Password reset token expiry time
+
+Minutes until reset link expires
+
+**Environment Variable:** `PASSWORD_RESET_TOKEN_EXPIRY_MINUTES`
+
+**Default:** `60`
+
+---
+
+#### Maximum reset requests per time window
+
+Maximum number of reset requests allowed per email address
+
+**Environment Variable:** `PASSWORD_RESET_RATE_LIMIT_REQUESTS`
+
+**Default:** `3`
+
+---
+
+#### Rate limit time window
+
+Time window for rate limiting (minutes)
+
+**Environment Variable:** `PASSWORD_RESET_RATE_LIMIT_WINDOW_MINUTES`
+
+**Default:** `60`
+
+---
+
+#### Maximum failed validation attempts
+
+Failed attempts before account lockout
+
+**Environment Variable:** `PASSWORD_RESET_MAX_ATTEMPTS`
+
+**Default:** `5`
+
+---
+
+#### Account lockout duration
+
+Minutes to lock account after max failed attempts
+
+**Environment Variable:** `PASSWORD_RESET_LOCKOUT_DURATION_MINUTES`
+
+**Default:** `60`
+
+---
+
+#### Additional hosts for the reset link
+
+Comma-separated list of additional hostnames (optionally with a port, e.g. vpn.example.com:9443) under which the password reset link may follow the actual request host instead of SERVER_HOSTNAME. Only hosts in this list, plus SERVER_HOSTNAME, are ever used; any other request host falls back to SERVER_HOSTNAME. This allowlist is what prevents password reset poisoning (CWE-640), so leave it empty unless the instance is genuinely reachable under more than one name.
+
+**Environment Variable:** `PASSWORD_RESET_ALLOWED_HOSTS`
+
+**Default:** ``
 
 ---
 
@@ -1136,4 +1246,4 @@ Example:
 ---
 
 *This documentation was automatically generated from the configuration registry.*
-*Last updated: 2026-05-22 15:34:07 UTC*
+*Last updated: 2026-07-28 09:15:24 UTC*
