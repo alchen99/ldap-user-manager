@@ -192,6 +192,73 @@ function totp_validate_code($secret, $code, $window = 1, $time_step = 30) {
 }
 
 /**
+ * How long a used TOTP code must be remembered: its whole validity window.
+ * A code is accepted across (2*window + 1) steps, so remembering it for that long
+ * blocks replay for as long as the code would otherwise work.
+ */
+function totp_used_code_ttl($window = 1, $time_step = 30) {
+  return ((2 * $window) + 1) * $time_step;
+}
+
+/**
+ * Has this TOTP code already been accepted for this user within its validity window?
+ *
+ * Replay protection lives here (called from the login verify path), not in
+ * totp_validate_code(), because enrolment validates codes over AJAX and marking them
+ * used there would break a legitimate retry (see #270). Codes are stored hashed, keyed
+ * per user, in /tmp - matching the pending-MFA session and rate-limit storage.
+ *
+ * @return bool TRUE if the code was already used (i.e. this is a replay)
+ */
+function totp_code_recently_used($user_id, $code, $window = 1, $time_step = 30) {
+  $file_path = "/tmp/totp_used_" . hash('sha256', $user_id);
+  if (!file_exists($file_path)) { return FALSE; }
+
+  $lines = file($file_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+  if ($lines === FALSE) { return FALSE; }  // fail open, as with rate limiting
+
+  $cutoff = time() - totp_used_code_ttl($window, $time_step);
+  $code_hash = hash('sha256', $user_id . ':' . $code);
+
+  foreach ($lines as $line) {
+    list($stored_hash, $stored_time) = array_pad(explode(':', $line, 2), 2, 0);
+    if (intval($stored_time) >= $cutoff && hash_equals($stored_hash, $code_hash)) {
+      return TRUE;
+    }
+  }
+
+  return FALSE;
+}
+
+/**
+ * Record a TOTP code as used for this user, pruning entries that have aged out of the
+ * window so the file can't grow without bound. Pairs with totp_code_recently_used().
+ */
+function totp_mark_code_used($user_id, $code, $window = 1, $time_step = 30) {
+  global $log_prefix;
+
+  $file_path = "/tmp/totp_used_" . hash('sha256', $user_id);
+  $cutoff = time() - totp_used_code_ttl($window, $time_step);
+
+  $kept = array();
+  if (file_exists($file_path)) {
+    $lines = file($file_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines !== FALSE) {
+      foreach ($lines as $line) {
+        list(, $stored_time) = array_pad(explode(':', $line, 2), 2, 0);
+        if (intval($stored_time) >= $cutoff) { $kept[] = $line; }
+      }
+    }
+  }
+
+  $kept[] = hash('sha256', $user_id . ':' . $code) . ':' . time();
+
+  if (file_put_contents($file_path, implode("\n", $kept) . "\n", LOCK_EX) === FALSE) {
+    error_log("$log_prefix Failed to record used TOTP code for replay protection: $file_path", 0);
+  }
+}
+
+/**
  * Generate a QR code URL for Google Authenticator
  *
  * @param string $secret Base32-encoded secret

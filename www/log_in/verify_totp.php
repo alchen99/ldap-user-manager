@@ -65,28 +65,39 @@ if (isset($_POST['totp_code'])) {
 
         // Validate TOTP code (with window of 1 = ±30 seconds)
         if (totp_validate_code($totp_secret, $totp_code, 1, 30)) {
-          // TOTP code valid - complete login
-          ldap_close($ldap_connection);
 
-          // Clean up temp session
-          @ unlink($temp_file_path);
-          setcookie('mfa_temp_auth', '', time() - 3600, '/');
-
-          // Audit log successful MFA verification
-          audit_log('mfa_verify_success', $account_id, 'TOTP code verified during login', 'success', $account_id);
-
-          // Set the real session cookie
-          set_passkey_cookie($account_id, $is_admin);
-
-          // Redirect to appropriate destination
-          if ($redirect_to) {
-            header("Location: //{$_SERVER['HTTP_HOST']}" . base64_decode($redirect_to) . "\n\n");
+          if (totp_code_recently_used($account_id, $totp_code, 1, 30)) {
+            // Code is valid but already used within its window - reject the replay (#270).
+            // Falls through to render the page with the error; ldap_close happens below.
+            audit_log('mfa_verify_failure', $account_id, 'Replayed TOTP code rejected during login', 'failure', $account_id);
+            $error_message = "That code has already been used. Wait for your authenticator app to show a new one and try again.";
           }
           else {
-            $default_module = $is_admin ? "account_manager" : "home";
-            header("Location: //{$_SERVER['HTTP_HOST']}{$SERVER_PATH}$default_module?logged_in\n\n");
+            totp_mark_code_used($account_id, $totp_code, 1, 30);
+
+            // TOTP code valid - complete login
+            ldap_close($ldap_connection);
+
+            // Clean up temp session
+            @ unlink($temp_file_path);
+            setcookie('mfa_temp_auth', '', time() - 3600, '/');
+
+            // Audit log successful MFA verification
+            audit_log('mfa_verify_success', $account_id, 'TOTP code verified during login', 'success', $account_id);
+
+            // Set the real session cookie
+            set_passkey_cookie($account_id, $is_admin);
+
+            // Redirect to appropriate destination
+            if ($redirect_to) {
+              header("Location: //{$_SERVER['HTTP_HOST']}" . base64_decode($redirect_to) . "\n\n");
+            }
+            else {
+              $default_module = $is_admin ? "account_manager" : "home";
+              header("Location: //{$_SERVER['HTTP_HOST']}{$SERVER_PATH}$default_module?logged_in\n\n");
+            }
+            exit;
           }
-          exit;
         }
         else {
           // Invalid TOTP code

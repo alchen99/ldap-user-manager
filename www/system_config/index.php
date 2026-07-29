@@ -17,6 +17,14 @@ function display_config_item($key, $metadata) {
   $default_value = $metadata['default'];
   $is_default = is_config_default($key);
 
+  // Mask sensitive values (e.g. passwords) so they leak neither into the visible cell nor
+  // the data-search attribute in the page source (fixes #271). Only mask when actually set,
+  // so an unset credential still shows "(not set)". Fixed-length mask hides the real length.
+  if (!empty($metadata['hide_value'])) {
+    $value_is_set = is_array($current_value) ? count($current_value) > 0 : ((string)$current_value !== '');
+    if ($value_is_set) { $current_value = '********'; }
+  }
+
   // Build searchable text for this config
   $searchable_text = $metadata['description'] . ' ' .
                      ($metadata['help'] ?? '') . ' ' .

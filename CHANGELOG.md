@@ -2,6 +2,11 @@
 
 ## [2.2.1]
 
+### Security
+
+- **[#270](https://github.com/wheelybird/luminary/issues/270)** - A TOTP code can no longer be replayed within its validity window during login. Once a code has been accepted, it is remembered (hashed, per user) for the ~90-second window it would otherwise remain valid, and a second submission of the same code is rejected (RFC 6238 §5.2). The check lives in the login verify path only, so enrolment — which validates codes over AJAX and legitimately retries — is unaffected.
+- **[#271](https://github.com/wheelybird/luminary/issues/271)** - The System configuration page no longer reveals `LDAP_ADMIN_BIND_PWD` or `SMTP_PASSWORD` in clear text. Values flagged `hide_value` in the registry are now masked, which also keeps them out of the row's `data-search` attribute in the page source. Unset credentials still show "(not set)" so you can tell whether one is configured.
+
 ### Fixed
 
 - **[#268](https://github.com/wheelybird/luminary/issues/268)** - Saving a group's description (or any attribute) from the Attributes tab no longer removes the group's members. The Attributes tab now has its own handler (`group_attributes_handler.php`) and form marker, so attribute updates and membership changes are fully independent operations.
